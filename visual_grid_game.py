@@ -53,6 +53,7 @@ class VisualGridHuntGame:
         self.steps = 0
         self.collision = False
 
+    # IT24610328---Added smells_toxin to the percept dictionary to inform the agent about the presence of toxic traps.    
     def get_percept(self) -> dict:
         return {
             'agent_pos': list(self.agent_pos),
