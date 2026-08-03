@@ -7,11 +7,19 @@ class VisualGridHuntGame:
     """A flexible Pacman-style grid environment with support for configurable opponents and larger scales."""
 
 
-    # IT24610328---Adding num_traps input value in addition to the existing values for width, height, num_food, num_opponents, and custom_walls.
-    def __init__(self, width=10, height=10, num_food=10, num_opponents=2, num_traps=3, custom_walls=None):
+    # IT24610328---Lab01---Adding num_traps input value in addition to the existing values for width, height, num_food, num_opponents, and custom_walls.
+    def __init__(self, width=10, height=10, facing='Up', num_food=10, num_opponents=2, num_traps=3, custom_walls=None):
         self.width = width
         self.height = height
-        self.agent_pos = [0, 0]  # Starting position (x, y)
+
+        #IT24610328---Lab02---Adding a facing attribute to the environment to track the agent's current facing direction
+        self.facing = facing
+
+        #IT24610328---Lab02---Adding a facing_before attribute to the environment to track the agent's previous facing direction
+        self.facing_before = self.facing
+
+        #IT24610328---Lab01---Setting the agent's starting position to (6, 0) to be directly under u pocket shaped walls.
+        self.agent_pos = [6, 0]  # Starting position (x, y)
 
         if custom_walls is not None:
             self.walls = set(custom_walls)
@@ -37,7 +45,7 @@ class VisualGridHuntGame:
             if tuple(op_pos) != (0, 0) and tuple(op_pos) not in self.walls and tuple(op_pos) not in self.food_positions:
                 self.opponents.append(op_pos)
 
-        # IT24610328---Generate toxic traps, avoiding agent start, walls, food, and opponents
+        # IT24610328---Lab01---Generate toxic traps, avoiding agent start, walls, food, and opponents
         self.toxic_traps = set()
         while len(self.toxic_traps) < num_traps:
             tx = random.randint(0, self.width - 1)
@@ -53,21 +61,106 @@ class VisualGridHuntGame:
         self.steps = 0
         self.collision = False
 
-    # IT24610328---Added smells_toxin to the percept dictionary to inform the agent about the presence of toxic traps.    
+    #IT24610328---Lab02---Adding a method to get the position of the cell directly in front of the agent in the direction it is currently facing.
+    #IT24610328---Lab02---Returning None if the position ahead is out of bounds, otherwise returning the valid position.
+    def _get_ahead_position(self):
+        ax, ay = self.agent_pos
+        if self.facing == 'Up':
+            nx, ny = ax, ay + 1
+        elif self.facing == 'Down':
+            nx, ny = ax, ay - 1
+        elif self.facing == 'Left':
+            nx, ny = ax - 1, ay
+        elif self.facing == 'Right':
+            nx, ny = ax + 1, ay
+        else:
+            nx, ny = ax, ay
+
+        if 0 <= nx < self.width and 0 <= ny < self.height:
+            return (nx, ny)
+        return None  
+
+    #IT24610328---Lab02---Adding a method to get the position of the cell directly to the left of the agent based on its current facing direction.
+    def _get_left_position(self):
+        ax, ay = self.agent_pos
+
+        if self.facing == 'Up':
+            nx, ny = ax - 1, ay
+        elif self.facing == 'Down':
+            nx, ny = ax + 1, ay
+        elif self.facing == 'Left':
+            nx, ny = ax, ay - 1
+        elif self.facing == 'Right':
+            nx, ny = ax, ay + 1
+        else:
+            nx, ny = ax, ay
+
+        if 0 <= nx < self.width and 0 <= ny < self.height:
+            return (nx, ny)
+        return None
+
+    #IT24610328---Lab02---Adding a method to get the position of the cell directly to the right of the agent based on its current facing direction.
+    def _get_right_position(self):
+        ax, ay = self.agent_pos
+
+        if self.facing == 'Up':
+            nx, ny = ax + 1, ay
+        elif self.facing == 'Down':
+            nx, ny = ax - 1, ay
+        elif self.facing == 'Left':
+            nx, ny = ax, ay + 1
+        elif self.facing == 'Right':
+            nx, ny = ax, ay - 1
+        else:
+            nx, ny = ax, ay
+
+        if 0 <= nx < self.width and 0 <= ny < self.height:
+            return (nx, ny)
+        return None
+
+    # IT24610328---Lab01---Added smells_toxin to the percept dictionary to inform the agent about the presence of toxic traps.  
+    
+    #IT24610328---Lab02---Added wall_ahead, food_ahead, toxin_ahead, and opponent_ahead to the percept dictionary to inform the agent about the presence of walls, food, toxic traps, and opponents in the cell directly in front of it based on its current facing direction.
+    #IT24610328---Lab02---Added facing to the percept dictionary to inform the agent about its current facing direction.
+    #IT24610328---Lab02---Removed remaining_food from the percept dictionary as it classifies as global information and is not directly perceivable by the agent in its immediate environment.
+    #IT24610328---Lab02---Added wall_left and wall_right to the percept dictionary to inform the model agent about the presence of walls in the cells directly to its left and right based on its current facing direction.
     def get_percept(self) -> dict:
+        ahead_pos = self._get_ahead_position()
+        left_pos = self._get_left_position()
+        right_pos = self._get_right_position()
+
+        opponent_positions_set = {tuple(op) for op in self.opponents}
+
         return {
-            'agent_pos': list(self.agent_pos),
-            'opponent_positions': [list(op) for op in self.opponents],
-            'smells_food': tuple(self.agent_pos) in self.food_positions,
-            'hit_wall': tuple(self.agent_pos) in self.walls,
-            'smells_toxin': tuple(self.agent_pos) in self.toxic_traps,
+            'facing': self.facing,
+
+            'wall_ahead': ahead_pos is None or ahead_pos in self.walls,
+            'wall_left': left_pos is None or left_pos in self.walls,
+            'wall_right': right_pos is None or right_pos in self.walls,
+
+            'food_here': tuple(self.agent_pos) in self.food_positions,
+            'food_ahead': ahead_pos is not None and ahead_pos in self.food_positions,
+
+            'toxin_here': tuple(self.agent_pos) in self.toxic_traps,
+            'toxin_ahead': ahead_pos is not None and ahead_pos in self.toxic_traps,
+
+            'opponent_here': tuple(self.agent_pos) in opponent_positions_set,
+            'opponent_ahead': ahead_pos is not None and ahead_pos in opponent_positions_set,
+
             'collision': self.collision,
-            'score': self.score,
-            'remaining_food': len(self.food_positions)
-        }
+    }
 
     def execute_action(self, action: str):
         self.steps += 1
+
+        #IT24610328---Lab02---Update the facing attribute based on the action taken by the agent.
+        self.facing_before = self.facing
+        self.facing = action
+
+        #IT24610328---Lab02---If the action is a different direction than we were already facing, treat it as a pure turn, no movement
+        if action != self.facing_before:
+            return
+
         new_pos = list(self.agent_pos)
 
         if action == 'Up':
@@ -89,7 +182,7 @@ class VisualGridHuntGame:
             self.food_positions.remove(tuple_pos)
             self.score += 20
 
-        # IT24610328---Check for toxic traps and apply penalty if the agent steps on one.
+        # IT24610328---Lab01---Check for toxic traps and apply penalty if the agent steps on one.
         if tuple_pos in self.toxic_traps:
             self.score -= 15
 
@@ -111,18 +204,123 @@ class VisualGridHuntGame:
     def is_done(self) -> bool:
         return len(self.food_positions) == 0 or self.steps >= 60 or self.collision
 
+#IT24610328---Lab02---Implementing a simple reflex agent that makes decisions based on the current percept from the environment.   
+class SimpleReflexAgent:
+    def sense_and_act(self, percept: dict) -> str:
+        turn_left = {'Up': 'Left', 'Left': 'Down', 'Down': 'Right', 'Right': 'Up'}
 
+        # Rule 1: avoid immediate danger
+        if percept['wall_ahead'] or percept['toxin_ahead'] or percept['opponent_ahead']:
+            return turn_left[percept['facing']]
+
+        # Rule 2: food ahead, keep moving forward into it
+        if percept['food_ahead']:
+            return percept['facing']
+
+        # Rule 3: nothing interesting, just keep going forward
+        return percept['facing']
+
+#IT24610328---Lab02---Implementing a model-based agent that remembers previously encountered states.
+class ModelBasedAgent:
+    def __init__(self):
+
+        #IT24610328---Lab02---Track the agent's estimated relative position.
+        self.rel_pos = (0, 0)
+
+        #IT24610328---Lab02---Store how many times each state has been visited.
+        self.visits = {}
+
+        #IT24610328---Lab02---Store the previous facing direction and action.
+        self.last_facing = None
+        self.last_action = None
+
+    def sense_and_act(self, percept: dict) -> str:
+
+        turn_left = {
+            'Up': 'Left',
+            'Left': 'Down',
+            'Down': 'Right',
+            'Right': 'Up'
+        }
+
+        turn_right = {
+            'Up': 'Right',
+            'Right': 'Down',
+            'Down': 'Left',
+            'Left': 'Up'
+        }
+
+        dir_vectors = {
+            'Up': (0, 1),
+            'Down': (0, -1),
+            'Left': (-1, 0),
+            'Right': (1, 0)
+        }
+
+        facing = percept['facing']
+
+        #IT24610328---Lab02---Update the estimated relative position after moving forward.
+        if (
+            self.last_action is not None
+            and self.last_facing is not None
+            and self.last_action == self.last_facing
+        ):
+            dx, dy = dir_vectors[self.last_facing]
+            self.rel_pos = (
+                self.rel_pos[0] + dx,
+                self.rel_pos[1] + dy
+            )
+
+        #IT24610328---Lab02---Represent the current internal state using the estimated position and facing direction.
+        state = (self.rel_pos, facing)
+
+        #IT24610328---Lab02---Count how many times this state has been encountered.
+        self.visits[state] = self.visits.get(state, 0) + 1
+
+        #IT24610328---Lab02---Avoid immediate dangers.
+        if percept['toxin_ahead'] or percept['opponent_ahead']:
+            action = turn_left[facing]
+            self.last_facing = facing
+            self.last_action = action
+            return action
+
+        #IT24610328---Lab02---Use the stored state history to choose an alternative turn when the same wall situation is encountered again.
+        if percept['wall_ahead']:
+
+            if self.visits[state] >= 2:
+                action = turn_right[facing]
+            else:
+                action = turn_left[facing]
+
+            self.last_facing = facing
+            self.last_action = action
+            return action
+
+        #IT24610328---Lab02---Move forward when there is no immediate danger.
+        self.last_facing = facing
+        self.last_action = facing
+        return facing
+    
 class GridGameGUI:
     """Tkinter wrapper that dynamically scales cell sizes to keep larger grids on screen."""
 
-    # IT24610328---Adding num_traps input value in addition to the existing values for width, height, num_food, num_opponents, and walls for the GUI.
+    # IT24610328---Lab01---Adding num_traps input value in addition to the existing values for width, height, num_food, num_opponents, and walls for the GUI.
     def __init__(self, root, width=10, height=10, num_food=12, num_opponents=2, num_traps=3, walls=None):
         self.root = root
         self.root.title("IT3012 - Scalable Multi-Agent Grid Hunt")
 
-        #IT24610328---Pass num_traps to the VisualGridHuntGame constructor to ensure traps are included in the environment.
+        #IT24610328---Lab01---Pass num_traps to the VisualGridHuntGame constructor to ensure traps are included in the environment.
         self.env = VisualGridHuntGame(width=width, height=height, num_food=num_food, num_opponents=num_opponents, num_traps=num_traps,
                                       custom_walls=walls)
+
+        #IT24610328---Lab02---Instantiate the SimpleReflexAgent to be used in the GUI for decision-making based on percepts.
+        #IT24610328---Lab02---Uncomment the following line to use the SimpleReflexAgent instead of the ModelBasedAgent.
+
+        #self.agent = SimpleReflexAgent()
+
+        #IT24610328---Lab02---Instantiate the ModelBasedAgent to be used in the GUI for decision-making based on percepts and internal state.
+        #Comment the following line to use the SimpleReflexAgent instead of the ModelBasedAgent.
+        self.agent = ModelBasedAgent()  
 
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
         max_canvas_dim = 600
@@ -168,7 +366,7 @@ class GridGameGUI:
             self.canvas.create_oval(x1, y1, x1 + self.cell_size * 0.5, y1 + self.cell_size * 0.5, fill="#f59e0b",
                                     outline="#d97706")
 
-        # IT24610328---Draw toxic traps as purple triangles by iterating through each trap position
+        # IT24610328---Lab01---Draw toxic traps as purple triangles by iterating through each trap position
         for tx, ty in self.env.toxic_traps:
             offset = self.cell_size * 0.2
             x1 = tx * self.cell_size + offset
@@ -195,7 +393,11 @@ class GridGameGUI:
 
         def step():
             if not self.env.is_done():
-                action = random.choice(['Up', 'Down', 'Left', 'Right'])
+                
+                #IT24610328---Lab02---Use the simple reflex agent to determine the next action based on the current percept.
+                percept = self.env.get_percept()
+                action = self.agent.sense_and_act(percept)
+                
                 self.env.execute_action(action)
 
                 self.draw_grid()
@@ -211,6 +413,7 @@ class GridGameGUI:
 
 if __name__ == "__main__":
     root = tk.Tk()
-    # Try a larger grid size like 12x12 with 15 food and 3 opponents!
-    app = GridGameGUI(root, width=12, height=12, num_food=15, num_opponents=0)
+    #IT24610328---Lab02---Added walls for demonstration of agent getting stuck in a u shaped corner.
+    walls = [(4,3), (7,6), (5,3), (7,3), (4,4), (7,4), (4,5), (7,5), (4,6), (5,6), (6,6)]
+    app = GridGameGUI(root, width=12, height=12, num_food=15, num_opponents=2,walls=walls)
     root.mainloop()
