@@ -4,7 +4,8 @@ import random
 from collections import deque
 import heapq
 
-
+#IT24610328---Lab04---Importing math library for equations.
+import math
 
 class GreedyGridAgent:
     """A simple agent that tries to move around systematically to clear the grid."""
@@ -22,9 +23,17 @@ class GreedyGridAgent:
 #IT24610328---Lab03---Added a new SearchAgent class that implements BFS, DFS, and UCS search algorithms. The agent can switch between these algorithms by changing the active_algo attribute.
 class SearchAgent:
 
+    #IT24610328---Lab04---Added manhattan_distance heuristic, calculates the sum of absolute coordinate differences.
+    def manhattan_distance(self, pos, goal):
+        return abs(pos[0] - goal[0]) + abs(pos[1] - goal[1])
+
+    #IT24610328---Lab04---Added euclidean_distance heuristic, calculates straight-line distance between two points.
+    def euclidean_distance(self, pos, goal):
+        return math.sqrt((pos[0] - goal[0]) ** 2 + (pos[1] - goal[1]) ** 2)
+
     def __init__(self):
         self.plan = []
-        self.active_algo = 'BFS'  # switch to 'DFS' or 'UCS' to compare
+        self.active_algo = 'AStar'  # switch to 'BFS', 'DFS' or 'UCS' to compare
 
     #IT24610328---Lab03---Added _successors method to generate valid moves from the current state, considering walls and grid boundaries. 
     #IT24610328---Lab03---This method added as all three search algorithms (BFS, DFS, UCS) require the same logic to generate successors.
@@ -100,10 +109,56 @@ class SearchAgent:
                     heapq.heappush(frontier, (new_cost, counter, next_state, path + [action]))
         return []
 
+    #IT24610328---Lab04---Added astar_search
+    def astar_search(self, start_pos, goal_pos, walls, grid_size, heuristic_type='manhattan'):
+
+        #IT24610328---Lab04---Choose which heuristic function to use based on heuristic_type.
+        if heuristic_type == 'euclidean':
+            heuristic = self.euclidean_distance
+        else :
+            heuristic = self.manhattan_distance
+
+        counter = 0
+        h_start = heuristic(start_pos, goal_pos)
+
+        #IT24610328---Lab04--Initializing an empty priority queue (frontier)
+        #IT24610328---Lab04---Push the initial state into the priority queue with its f_cost, g_cost, and path.
+        frontier = [(h_start, 0, counter, start_pos, [])]  # (f_cost, g_cost, tie_breaker, pos, path)
+
+        #IT24610328---Lab04---Initializing an empty set
+        reached_states = set()
+
+        #IT24610328---Lab04---Create a while loop that continues until the frontier is empty. 
+        while frontier:
+            f_cost, g_cost, _, current_pos, path = heapq.heappop(frontier)
+
+            #IT24610328---Lab04---Check if the current position is the goal position. If it is, return the path taken to reach the goal.
+            if current_pos == goal_pos:
+                return path
+
+            #IT24610328---Lab04---Check if the current position has already been reached. If it has, skip to the next iteration of the loop. Otherwise, add the current position to the reached_states set.
+            if current_pos in reached_states:
+                continue
+            reached_states.add(current_pos)
+
+            #IT24610328---Lab04---For node expansion, checking all adjacent cells (neighbours/succesors)
+            for action, next_pos, step_cost in self._successors(current_pos, walls, grid_size):
+                if next_pos not in reached_states:
+                    #IT24610328---Lab04---For each valid neighbour, calculate the new g_cost, h_cost, and f_cost. Then push the neighbour into the priority queue with its f_cost, g_cost, and path.
+                    g_new = g_cost + step_cost
+                    h_new = heuristic(next_pos, goal_pos)
+                    f_new = g_new + h_new
+                    counter += 1
+                    heapq.heappush(frontier, (f_new, g_new, counter, next_pos, path + [action]))
+
+        return []
+
     #IT24610328---Lab03---Added sense_and_act method to determine the next action based on the current percept.
     def sense_and_act(self, percept):
 
         if not self.plan:
+
+            #IT24610328---Lab04--Extracting the global state from the percept dictionary
             start = percept['agent_pos']
             walls = set(percept['walls'])
             grid_size = percept['grid_size']
@@ -114,6 +169,7 @@ class SearchAgent:
 
             #IT24610328---Lab03---Pick closest food by manhattan distance as the target.
             #IT24610328---Lab03---Manhattan distance only used to determine the closest food item, not for pathfinding.
+            #IT24610328---Lab04---Finding the closest item to be the goal position
             goal = min(
                 all_food,
                 key=lambda f: abs(f[0] - start[0]) + abs(f[1] - start[1])
@@ -126,6 +182,10 @@ class SearchAgent:
                 self.plan = self.dfs_search(start, goal, walls, grid_size)
             elif self.active_algo == 'UCS':
                 self.plan = self.ucs_search(start, goal, walls, grid_size)
+
+            #IT24610328---Lab04---Added AStar branch
+            elif self.active_algo == 'AStar':
+                self.plan = self.astar_search(start, goal, walls, grid_size, heuristic_type='manhattan')
 
             if not self.plan:
                 return percept['facing']  # no path found,

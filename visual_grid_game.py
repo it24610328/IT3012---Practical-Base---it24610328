@@ -331,6 +331,7 @@ class GridGameGUI:
 
         #IT24610328---Lab03---Instantiate the SearchAgent to be used in the GUI for decision-making based on percepts and internal state.
         #Uncomment the following line to use the SearchAgent.
+        #IT24610328---Lab04---The SearchAgent can now use A* to plan a path to the nearest food while avoiding walls, traps, and opponents.
         self.agent = SearchAgent()  
 
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
