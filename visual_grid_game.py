@@ -1,7 +1,8 @@
 # visual_grid_game.py
 import random
 import tkinter as tk
-
+#IT24610328---Lab03---Importing the SearchAgent class from agent.py to be used in the VisualGridHuntGame environment.
+from agent import SearchAgent
 
 class VisualGridHuntGame:
     """A flexible Pacman-style grid environment with support for configurable opponents and larger scales."""
@@ -148,6 +149,13 @@ class VisualGridHuntGame:
             'opponent_ahead': ahead_pos is not None and ahead_pos in opponent_positions_set,
 
             'collision': self.collision,
+
+            # IT24610328---Lab03---Added the agent's current position, grid size, walls, and all food positions to the percept dictionary to provide the agent with the global state.
+            'agent_pos': tuple(self.agent_pos),
+            'grid_size': (self.width, self.height),
+            'walls': list(self.walls),
+            'all_food': list(self.food_positions),
+
     }
 
     def execute_action(self, action: str):
@@ -158,8 +166,7 @@ class VisualGridHuntGame:
         self.facing = action
 
         #IT24610328---Lab02---If the action is a different direction than we were already facing, treat it as a pure turn, no movement
-        if action != self.facing_before:
-            return
+        #IT24610328---Lab03---Removed the early return here. The SearchAgent's bfs_search/dfs_search/ucs_search treat every action as a direct 1-step move with no separate turning cost, so keeping the turn-only behavior caused the agent to get stuck alternating directions without ever moving. Every action now moves the agent immediately, matching the cost model used in _successors.
 
         new_pos = list(self.agent_pos)
 
@@ -320,7 +327,11 @@ class GridGameGUI:
 
         #IT24610328---Lab02---Instantiate the ModelBasedAgent to be used in the GUI for decision-making based on percepts and internal state.
         #Comment the following line to use the SimpleReflexAgent instead of the ModelBasedAgent.
-        self.agent = ModelBasedAgent()  
+        #self.agent = ModelBasedAgent()  
+
+        #IT24610328---Lab03---Instantiate the SearchAgent to be used in the GUI for decision-making based on percepts and internal state.
+        #Uncomment the following line to use the SearchAgent.
+        self.agent = SearchAgent()  
 
         # Dynamically calculate cell size so the total canvas fits nicely within a 600x600 window ceiling
         max_canvas_dim = 600
@@ -395,6 +406,7 @@ class GridGameGUI:
             if not self.env.is_done():
                 
                 #IT24610328---Lab02---Use the simple reflex agent to determine the next action based on the current percept.
+                #IT24610328---Lab03---Use the search agent to determine the next action based on the current percept.
                 percept = self.env.get_percept()
                 action = self.agent.sense_and_act(percept)
                 
@@ -410,10 +422,22 @@ class GridGameGUI:
 
         step()
 
-
 if __name__ == "__main__":
     root = tk.Tk()
     #IT24610328---Lab02---Added walls for demonstration of agent getting stuck in a u shaped corner.
-    walls = [(4,3), (7,6), (5,3), (7,3), (4,4), (7,4), (4,5), (7,5), (4,6), (5,6), (6,6)]
-    app = GridGameGUI(root, width=12, height=12, num_food=15, num_opponents=2,walls=walls)
+    #IT24610328---Lab03---Maze-style walls with multiple corridors and dead ends to clearly demonstrate the difference in path quality between BFS, DFS, and UCS.
+    walls = [
+        (1,9), (2,9), (3,9), (3,8), (3,7), (1,7),
+
+        (5,1), (5,2), (5,3), (5,4), (5,5), (5,6), (5,7), (5,8),
+        (6,8), (7,8), (8,8), (9,8),
+
+        (7,1), (7,2), (7,3), (7,4), (7,5),
+        (8,5), (9,5),
+
+        (9,1), (9,2), (10,1), (10,2), (10,3),
+
+        (3,3), (3,4), (4,4),
+    ]
+    app = GridGameGUI(root, width=12, height=12, num_food=1, num_opponents=2, walls=walls)
     root.mainloop()
