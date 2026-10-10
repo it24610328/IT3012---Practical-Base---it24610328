@@ -7,6 +7,9 @@ import heapq
 #IT24610328---Lab04---Importing math library for equations.
 import math
 
+#IT24610328---Lab07---Part3---Importing the KnowledgeBase class from logic_engine.py
+from logic_engine import KnowledgeBase
+
 class GreedyGridAgent:
     """A simple agent that tries to move around systematically to clear the grid."""
 
@@ -34,6 +37,15 @@ class SearchAgent:
     def __init__(self):
         self.plan = []
         self.active_algo = 'AStar'  # switch to 'BFS', 'DFS' or 'UCS' to compare
+
+        #IT24610328---Lab07---Part3---Creating the Knowledge Base for the agent.
+        self.kb = KnowledgeBase()
+
+        #IT24610328---Lab07---Part3---Adding Rule 1: TargetVisible AND HasDust => SafeToEngage
+        self.kb.tell_rule(['TargetVisible', 'HasDust'], 'SafeToEngage')
+
+        #IT24610328---Lab07---Part3---Adding Rule 2: SafeToEngage AND BloodseekerMissing => Retreat
+        self.kb.tell_rule(['SafeToEngage', 'BloodseekerMissing'], 'Retreat')
 
     #IT24610328---Lab03---Added _successors method to generate valid moves from the current state, considering walls and grid boundaries. 
     #IT24610328---Lab03---This method added as all three search algorithms (BFS, DFS, UCS) require the same logic to generate successors.
@@ -110,7 +122,12 @@ class SearchAgent:
         return []
 
     #IT24610328---Lab04---Added astar_search
-    def astar_search(self, start_pos, goal_pos, walls, grid_size, heuristic_type='manhattan'):
+    #IT24610328---Lab07---Part3---Adding a tile_facts parameter to pass the per-tile facts into A*.
+    def astar_search(self, start_pos, goal_pos, walls, grid_size, heuristic_type='manhattan', tile_facts=None):
+
+        #IT24610328---Lab07---Part3---Treating None as an empty dictionary.
+        if tile_facts is None:
+            tile_facts = {}
 
         #IT24610328---Lab04---Choose which heuristic function to use based on heuristic_type.
         if heuristic_type == 'euclidean':
@@ -144,6 +161,21 @@ class SearchAgent:
             #IT24610328---Lab04---For node expansion, checking all adjacent cells (neighbours/succesors)
             for action, next_pos, step_cost in self._successors(current_pos, walls, grid_size):
                 if next_pos not in reached_states:
+
+                    #IT24610328---Lab07---Part3---Clearing the KB facts before checking this neighbour.
+                    self.kb.clear_facts()
+
+                    #IT24610328---Lab07---Part3---Feeding this tile's facts into the KB.
+                    for fact in tile_facts.get(next_pos, []):
+                        self.kb.tell_fact(fact)
+
+                    #IT24610328---Lab07---Part3---Running forward chaining to deduce new facts.
+                    self.kb.forward_chain()
+
+                    #IT24610328---Lab07---Part3---Marking the tile as Infeasible if Retreat is deduced and skipping it, even though it is physically reachable.
+                    if 'Retreat' in self.kb.facts:
+                        continue
+
                     #IT24610328---Lab04---For each valid neighbour, calculate the new g_cost, h_cost, and f_cost. Then push the neighbour into the priority queue with its f_cost, g_cost, and path.
                     g_new = g_cost + step_cost
                     h_new = heuristic(next_pos, goal_pos)
@@ -185,7 +217,15 @@ class SearchAgent:
 
             #IT24610328---Lab04---Added AStar branch
             elif self.active_algo == 'AStar':
-                self.plan = self.astar_search(start, goal, walls, grid_size, heuristic_type='manhattan')
+
+                #IT24610328---Lab07---Part3---Defining sample facts per tile. Placing the tiles next to the agent's start (6, 0) so the block is visible.
+                tile_facts = {
+                    (6, 1): ['TargetVisible', 'HasDust', 'BloodseekerMissing'],  # deduces Retreat: blocked
+                    (7, 0): ['TargetVisible', 'HasDust'],                        # SafeToEngage only: allowed
+                }
+
+                #IT24610328---Lab07---Part3---Passing tile_facts into A*.
+                self.plan = self.astar_search(start, goal, walls, grid_size, heuristic_type='manhattan', tile_facts=tile_facts)
 
             if not self.plan:
                 return percept['facing']  # no path found,
